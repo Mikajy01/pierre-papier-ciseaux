@@ -96,7 +96,6 @@ export default function Game() {
     socket.on('gameReady', (data: { players: string[] }) => {
       console.log('Game ready:', data);
       const opponent = data.players.find(id => id !== playerId);
-      if (opponent) setOpponentId(opponent);
     });
 
     socket.on('startGame', () => {
@@ -179,7 +178,6 @@ export default function Game() {
     setOtp('');
     setInputOtp('');
     setRoomId('');
-    setOpponentId('');
     setChoice(null);
     setOpponentChoice(null);
     setResult('');
