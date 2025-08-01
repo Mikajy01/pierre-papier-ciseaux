@@ -95,7 +95,6 @@ export default function Game() {
 
     socket.on('gameReady', (data: { players: string[] }) => {
       console.log('Game ready:', data);
-      const opponent = data.players.find(id => id !== playerId);
     });
 
     socket.on('startGame', () => {
