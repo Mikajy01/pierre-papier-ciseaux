@@ -11,7 +11,6 @@ export default function Game() {
   const [inputOtp, setInputOtp] = useState('');
   const [roomId, setRoomId] = useState('');
   const [playerId, setPlayerId] = useState('');
-  const [opponentId, setOpponentId] = useState('');
   const [choice, setChoice] = useState<Choice>(null);
   const [opponentChoice, setOpponentChoice] = useState<Choice>(null);
   const [result, setResult] = useState<string>('');
@@ -122,7 +121,6 @@ export default function Game() {
       result: string;
       winnerId: string | null;
     }) => {
-      let audio;
       console.log('Revealing choices:', data);
       const idPlayer = socket.id || '';
       const opponent = Object.keys(data.choices).find(id => id !== idPlayer);
