@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeu d'Encerclement Multijoueur</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .game-info {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            min-width: 300px;
+            flex: 1;
+        }
+
+        .game-board {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            flex: 2;
+            min-width: 400px;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .grid {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            background: #f8f9fa;
+            border: 2px solid #333;
+            border-radius: 10px;
+            cursor: crosshair;
+        }
+
+        .grid-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .intersection {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            transition: all 0.2s ease;
+            pointer-events: all;
+            z-index: 10;
+        }
+
+        .intersection:hover {
+            background: rgba(0, 0, 0, 0.4);
+            transform: translate(-50%, -50%) scale(1.2);
+        }
+
+        .intersection.occupied {
+            cursor: not-allowed;
+        }
+
+        .intersection.player1 {
+            background: #e74c3c;
+            box-shadow: 0 0 10px rgba(231, 76, 60, 0.6);
+        }
+
+        .intersection.player2 {
+            background: #3498db;
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.6);
+        }
+
+        .connection-line {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.7);
+            height: 2px;
+            transform-origin: left center;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .connection-line.player1 {
+            background: #e74c3c;
+        }
+
+        .connection-line.player2 {
+            background: #3498db;
+        }
+
+        .status {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .player-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .player {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .player.active {
+            background: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+
+        .player.me {
+            border: 2px solid #fff;
+        }
+
+        .score {
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .connection-status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .connected {
+            background: rgba(46, 204, 113, 0.3);
+        }
+
+        .disconnected {
+            background: rgba(231, 76, 60, 0.3);
+        }
+
+        .waiting {
+            background: rgba(241, 196, 15, 0.3);
+        }
+
+        button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .game-log {
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            opacity: 0.8;
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .grid-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .grid {
+                width: 150px;
+                height: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="game-info">
+            <h1>🎯 Jeu d'Encerclement</h1>
+            
+            <div id="connectionStatus" class="connection-status disconnected">
+                Connexion au serveur...
+            </div>
+
+            <div class="player-info">
+                <div class="player" id="player1Info">
+                    <div>Joueur 1</div>
+                    <div style="color: #e74c3c;">●</div>
+                    <div class="score" id="player1Score">0</div>
+                </div>
+                <div class="player" id="player2Info">
+                    <div>Joueur 2</div>
+                    <div style="color: #3498db;">●</div>
+                    <div class="score" id="player2Score">0</div>
+                </div>
+            </div>
+
+            <div class="status" id="gameStatus">
+                Connexion en cours...
+            </div>
+
+            <button onclick="joinGame()" id="joinBtn">Rejoindre une partie</button>
+            <button onclick="resetGame()" id="resetBtn" disabled>Nouvelle Partie</button>
+
+            <h3>📋 Journal de jeu</h3>
+            <div class="game-log" id="gameLog">
+                <div class="log-entry">Bienvenue dans le jeu d'encerclement!</div>
+                <div class="log-entry">Cliquez sur "Rejoindre une partie" pour commencer.</div>
+            </div>
+
+            <h3>📖 Règles</h3>
+            <div style="font-size: 14px; opacity: 0.9;">
+                <p>• Placez vos points sur les intersections libres</p>
+                <p>• Encerclez les points adverses pour marquer des points</p>
+                <p>• Le joueur avec le plus de points gagne</p>
+            </div>
+        </div>
+
+        <div class="game-board">
+            <h2 style="color: #333; text-align: center; margin-bottom: 20px;">Plateau de Jeu</h2>
+            <div class="grid-container" id="gridContainer">
+                <!-- Les grilles seront générées ici -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        class EncirclementGame {
+            constructor() {
+                this.socket = null;
+                this.gameState = {
+                    grids: Array(9).fill(null).map(() => Array(25).fill(0)),
+                    currentPlayer: 1,
+                    scores: { player1: 0, player2: 0 },
+                    playerId: null,
+                    gameActive: false
+                };
+                this.gridSize = 5;
+                this.init();
+            }
+
+            init() {
+                this.createGrids();
+                this.setupSocket();
+                this.addLogEntry("Initialisation du jeu...");
+            }
+
+            setupSocket() {
+                this.socket = io();
+                
+                this.socket.on('connect', () => {
+                    this.updateConnectionStatus('connected', 'Connecté au serveur');
+                    this.addLogEntry("Connecté au serveur");
+                    document.getElementById('joinBtn').disabled = false;
+                });
+
+                this.socket.on('disconnect', () => {
+                    this.updateConnectionStatus('disconnected', 'Déconnecté du serveur');
+                    this.addLogEntry("Déconnecté du serveur");
+                    document.getElementById('joinBtn').disabled = true;
+                    document.getElementById('resetBtn').disabled = true;
+                });
+
+                this.socket.on('gameJoined', (data) => {
+                    this.gameState.playerId = data.playerId;
+                    this.gameState = { ...this.gameState, ...data.gameState };
+                    
+                    // Marquer le joueur local
+                    document.getElementById(`player${data.playerId}Info`).classList.add('me');
+                    
+                    if (data.playerCount < 2) {
+                        this.updateConnectionStatus('waiting', 'En attente d\'un adversaire...');
+                        this.addLogEntry(`Vous êtes le joueur ${data.playerId}. En attente d'un adversaire...`);
+                    }
+                    
+                    document.getElementById('joinBtn').disabled = true;
+                    document.getElementById('resetBtn').disabled = false;
+                });
+
+                this.socket.on('gameStart', (data) => {
+                    this.gameState = { ...this.gameState, ...data.gameState };
+                    this.updateConnectionStatus('connected', 'Partie en cours');
+                    this.updateGameStatus();
+                    this.addLogEntry("La partie commence! C'est au joueur 1 de jouer.");
+                });
+
+                this.socket.on('moveMade', (data) => {
+                    this.gameState = { ...this.gameState, ...data.gameState };
+                    this.updateIntersectionDisplay(data.move.gridIndex, data.move.intersectionIndex);
+                    
+                    if (data.capturedPoints.length > 0) {
+                        this.drawConnections(data.move.gridIndex, data.capturedPoints, data.move.player);
+                        this.addLogEntry(`Joueur ${data.move.player} a encerclé ${data.capturedPoints.length} point(s)!`);
+                    }
+                    
+                    this.updateGameStatus();
+                    this.updateScores();
+                    this.addLogEntry(`Joueur ${data.move.player} a joué en grille ${data.move.gridIndex + 1}`);
+                });
+
+                this.socket.on('gameReset', (data) => {
+                    this.gameState = { ...this.gameState, ...data.gameState };
+                    this.createGrids();
+                    this.updateScores();
+                    this.updateGameStatus();
+                    this.addLogEntry("Nouvelle partie commencée!");
+                });
+
+                this.socket.on('playerDisconnected', () => {
+                    this.updateConnectionStatus('waiting', 'Adversaire déconnecté');
+                    this.gameState.gameActive = false;
+                    this.updateGameStatus();
+                    this.addLogEntry("Votre adversaire s'est déconnecté.");
+                });
+
+                this.socket.on('moveError', (data) => {
+                    this.addLogEntry(`Erreur: ${data.reason}`);
+                });
+            }
+
+            createGrids() {
+                const container = document.getElementById('gridContainer');
+                container.innerHTML = '';
+
+                for (let gridIndex = 0; gridIndex < 9; gridIndex++) {
+                    const grid = document.createElement('div');
+                    grid.className = 'grid';
+                    grid.dataset.gridIndex = gridIndex;
+
+                    // Créer les lignes de la grille
+                    const lines = document.createElement('div');
+                    lines.className = 'grid-lines';
+                    
+                    for (let i = 0; i < this.gridSize; i++) {
+                        const hLine = document.createElement('div');
+                        hLine.style.cssText = `
+                            position: absolute;
+                            left: 10%;
+                            right: 10%;
+                            height: 1px;
+                            background: rgba(0,0,0,0.3);
+                            top: ${10 + i * 20}%;
+                        `;
+                        lines.appendChild(hLine);
+
+                        const vLine = document.createElement('div');
+                        vLine.style.cssText = `
+                            position: absolute;
+                            top: 10%;
+                            bottom: 10%;
+                            width: 1px;
+                            background: rgba(0,0,0,0.3);
+                            left: ${10 + i * 20}%;
+                        `;
+                        lines.appendChild(vLine);
+                    }
+                    grid.appendChild(lines);
+
+                    // Créer les intersections
+                    for (let row = 0; row < this.gridSize; row++) {
+                        for (let col = 0; col < this.gridSize; col++) {
+                            const intersection = document.createElement('div');
+                            intersection.className = 'intersection';
+                            intersection.dataset.gridIndex = gridIndex;
+                            intersection.dataset.row = row;
+                            intersection.dataset.col = col;
+                            intersection.dataset.index = row * this.gridSize + col;
+                            
+                            const x = 10 + col * 20;
+                            const y = 10 + row * 20;
+                            intersection.style.left = x + '%';
+                            intersection.style.top = y + '%';
+                            
+                            intersection.addEventListener('click', (e) => this.handleIntersectionClick(e));
+                            grid.appendChild(intersection);
+                        }
+                    }
+
+                    container.appendChild(grid);
+                }
+
+                // Mettre à jour l'affichage des points existants
+                this.updateAllIntersections();
+            }
+
+            updateAllIntersections() {
+                for (let gridIndex = 0; gridIndex < 9; gridIndex++) {
+                    for (let intersectionIndex = 0; intersectionIndex < 25; intersectionIndex++) {
+                        if (this.gameState.grids[gridIndex][intersectionIndex] !== 0) {
+                            this.updateIntersectionDisplay(gridIndex, intersectionIndex);
+                        }
+                    }
+                }
+            }
+
+            handleIntersectionClick(event) {
+                if (!this.gameState.gameActive) return;
+                if (this.gameState.playerId !== this.gameState.currentPlayer) return;
+
+                const gridIndex = parseInt(event.target.dataset.gridIndex);
+                const intersectionIndex = parseInt(event.target.dataset.index);
+                const row = parseInt(event.target.dataset.row);
+                const col = parseInt(event.target.dataset.col);
+
+                if (this.gameState.grids[gridIndex][intersectionIndex] !== 0) return;
+
+                // Envoyer le coup au serveur
+                this.socket.emit('makeMove', {
+                    gridIndex,
+                    intersectionIndex,
+                    row,
+                    col
+                });
+            }
+
+            drawConnections(gridIndex, capturedPoints, player) {
+                const gridElement = document.querySelector(`[data-grid-index="${gridIndex}"]`);
+                
+                capturedPoints.forEach(point => {
+                    const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+                    
+                    directions.forEach(([dr, dc]) => {
+                        const adjRow = point.row + dr;
+                        const adjCol = point.col + dc;
+                        
+                        if (adjRow >= 0 && adjRow < this.gridSize && adjCol >= 0 && adjCol < this.gridSize) {
+                            const adjIndex = adjRow * this.gridSize + adjCol;
+                            
+                            if (this.gameState.grids[gridIndex][adjIndex] === player) {
+                                this.createConnectionLine(gridElement, point.row, point.col, adjRow, adjCol, player);
+                            }
+                        }
+                    });
+                });
+            }
+
+            createConnectionLine(gridElement, fromRow, fromCol, toRow, toCol, player) {
+                const line = document.createElement('div');
+                line.className = `connection-line player${player}`;
+                
+                const fromX = 10 + fromCol * 20;
+                const fromY = 10 + fromRow * 20;
+                const toX = 10 + toCol * 20;
+                const toY = 10 + toRow * 20;
+                
+                const dx = toX - fromX;
+                const dy = toY - fromY;
+                const length = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                
+                line.style.left = fromX + '%';
+                line.style.top = fromY + '%';
+                line.style.width = length + '%';
+                line.style.transform = `rotate(${angle}deg)`;
+                
+                gridElement.appendChild(line);
+                
+                setTimeout(() => {
+                    line.style.opacity = '0.7';
+                }, 50);
+            }
+
+            updateIntersectionDisplay(gridIndex, intersectionIndex) {
+                const intersection = document.querySelector(
+                    `[data-grid-index="${gridIndex}"][data-index="${intersectionIndex}"]`
+                );
+                
+                if (intersection) {
+                    const player = this.gameState.grids[gridIndex][intersectionIndex];
+                    intersection.classList.add('occupied', `player${player}`);
+                    intersection.style.transform = 'translate(-50%, -50%) scale(1.3)';
+                    
+                    setTimeout(() => {
+                        intersection.style.transform = 'translate(-50%, -50%) scale(1)';
+                    }, 200);
+                }
+            }
+
+            updateConnectionStatus(status, message) {
+                const statusElement = document.getElementById('connectionStatus');
+                statusElement.className = `connection-status ${status}`;
+                statusElement.textContent = message;
+            }
+
+            updateGameStatus() {
+                const statusElement = document.getElementById('gameStatus');
+                const player1Info = document.getElementById('player1Info');
+                const player2Info = document.getElementById('player2Info');
+                
+                player1Info.classList.toggle('active', this.gameState.currentPlayer === 1);
+                player2Info.classList.toggle('active', this.gameState.currentPlayer === 2);
+                
+                if (!this.gameState.gameActive) {
+                    statusElement.textContent = 'En attente d\'un adversaire...';
+                } else if (this.gameState.playerId === this.gameState.currentPlayer) {
+                    statusElement.textContent = 'À votre tour de jouer';
+                    statusElement.classList.add('pulse');
+                } else {
+                    statusElement.textContent = 'En attente du joueur adverse...';
+                    statusElement.classList.remove('pulse');
+                }
+            }
+
+            updateScores() {
+                document.getElementById('player1Score').textContent = this.gameState.scores.player1;
+                document.getElementById('player2Score').textContent = this.gameState.scores.player2;
+            }
+
+            addLogEntry(message) {
+                const log = document.getElementById('gameLog');
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+                log.appendChild(entry);
+                log.scrollTop = log.scrollHeight;
+            }
+        }
+
+        // Variables globales
+        let game;
+
+        // Fonctions globales
+        function joinGame() {
+            if (game && game.socket) {
+                game.socket.emit('joinGame');
+            }
+        }
+
+        function resetGame() {
+            if (game && game.socket) {
+                game.socket.emit('resetGame');
+            }
+        }
+
+        // Initialiser le jeu
+        window.addEventListener('DOMContentLoaded', () => {
+            game = new EncirclementGame();
+        });
+    </script>
+</body>
+</html>
