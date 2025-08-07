@@ -8,11 +8,12 @@ Un jeu en ligne **multijoueur** de Pierre-Papier-Ciseaux, développé avec :
 - 🏷️ **Chambres privées** : gestion via OTP unique par session
 
 ## 📁 Structure du projet
+```
 pierre-papier-ciseaux/
 ├── backend/ # Serveur Express (API, logique du jeu)
 ├── frontend/ # Interface utilisateur React (Vite)
 └── README.md # Ce fichier
-
+```
 
 ## 🚀 Démarrage rapide
 
