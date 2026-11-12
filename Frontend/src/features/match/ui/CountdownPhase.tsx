@@ -7,7 +7,7 @@ export function CountdownPhase({ countdown, myChoice, opponentLabel }: Props) {
   return (
     <div className="w-full max-w-3xl text-center">
       <Eyebrow>Révélation dans</Eyebrow>
-      <div key={countdown} className="mt-2 font-mono text-8xl sm:text-9xl font-medium text-accent animate-countdown">
+      <div key={countdown} className="mt-2 font-mono text-8xl sm:text-9xl font-medium text-accent animate-pop">
         {countdown}
       </div>
       <div className="mt-8 grid grid-cols-[1fr_auto_1fr] items-center gap-4">

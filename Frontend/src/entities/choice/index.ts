@@ -1,2 +1,2 @@
 export * from './model/choice';
-export { ChoiceModel, ChoiceHero } from './ui/scenes';
+export { ChoiceBattle, ChoiceHero, ChoiceModel } from './ui/scenes';

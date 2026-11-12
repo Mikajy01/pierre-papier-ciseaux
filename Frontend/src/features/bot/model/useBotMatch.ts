@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { resolveOutcome, type Choice, type Outcome } from '@/entities/choice';
 import { addToScore, EMPTY_SCORE, type MatchController, type MatchPhase, type Score } from '@/entities/match';
-import { playSound } from '@/shared/lib/sound';
 import { useCountdown } from '@/shared/lib/useCountdown';
 import { pickBotChoice } from '../lib/strategy';
 
@@ -52,7 +51,6 @@ export function useBotMatch({ onExit }: { onExit: () => void }): MatchController
           setOutcome(result);
           setScore((s) => addToScore(s, result));
           setPhase('result');
-          playSound(result);
         }, THINKING_MS + COUNTDOWN_S * 1000),
       );
     },

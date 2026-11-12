@@ -20,7 +20,7 @@ export function MatchView({ match }: { match: MatchController }) {
         <CountdownPhase countdown={match.countdown} myChoice={match.myChoice} opponentLabel={match.opponentLabel} />
       );
     case 'result':
-      return match.outcome ? (
+      return match.outcome && match.myChoice && match.opponentChoice ? (
         <ResultPhase
           outcome={match.outcome}
           myChoice={match.myChoice}

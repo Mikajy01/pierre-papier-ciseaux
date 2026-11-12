@@ -38,12 +38,12 @@ body {
   color: var(--color-zinc-300);
 }
 
-@keyframes countdown-pop {
+@keyframes pop {
   from { opacity: 0; transform: scale(1.35); }
   to { opacity: 1; transform: scale(1); }
 }
-.animate-countdown {
-  animation: countdown-pop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+.animate-pop {
+  animation: pop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @keyframes fade-in {

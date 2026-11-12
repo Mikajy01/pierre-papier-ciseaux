@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import { isChoice, resolveOutcome, type Choice, type Outcome } from '@/entities/choice';
 import { addToScore, EMPTY_SCORE, type MatchController, type MatchPhase, type Score } from '@/entities/match';
-import { playSound } from '@/shared/lib/sound';
 import { useCountdown } from '@/shared/lib/useCountdown';
 import { createGameSocket } from '../api/socket';
 import { ClientEvents as C, ServerEvents as S, type RevealPayload, type SessionPayload } from '../api/events';
@@ -95,7 +94,6 @@ export function useMultiplayer({ onNotice, onSessionEnd }: Options) {
       setOutcome(result);
       setScore((s) => addToScore(s, result));
       setPhase('result');
-      playSound(result);
     });
 
     socket.on(S.NEW_ROUND, resetRound);
