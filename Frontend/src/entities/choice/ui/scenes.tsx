@@ -1,10 +1,10 @@
 import { lazy, Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
-import type { ModelKind } from './Choice3D';
+import type { ChoiceSceneProps } from './three/ChoiceScene';
 
-// three.js is heavy: load it in a separate chunk.
-const ChoiceSceneLazy = lazy(() => import('./Choice3D').then((m) => ({ default: m.ChoiceScene })));
-const HeroSceneLazy = lazy(() => import('./Choice3D').then((m) => ({ default: m.HeroScene })));
+// three.js is heavy: every 3D scene is loaded in its own chunk.
+const ChoiceSceneLazy = lazy(() => import('./three/ChoiceScene').then((m) => ({ default: m.ChoiceScene })));
+const HeroSceneLazy = lazy(() => import('./three/ChoiceScene').then((m) => ({ default: m.HeroScene })));
 
 function Fallback({ className }: { className?: string }) {
   return (
@@ -14,9 +14,8 @@ function Fallback({ className }: { className?: string }) {
   );
 }
 
-type ChoiceModelProps = { kind: ModelKind; active?: boolean; className?: string };
-
-export function ChoiceModel({ className, ...props }: ChoiceModelProps) {
+/** A single floating 3D model of a choice. */
+export function ChoiceModel({ className, ...props }: ChoiceSceneProps) {
   return (
     <Suspense fallback={<Fallback className={className} />}>
       <ChoiceSceneLazy className={className} {...props} />
@@ -24,6 +23,7 @@ export function ChoiceModel({ className, ...props }: ChoiceModelProps) {
   );
 }
 
+/** Rock, paper and scissors side by side. */
 export function ChoiceHero({ className }: { className?: string }) {
   return (
     <Suspense fallback={<Fallback className={className} />}>
