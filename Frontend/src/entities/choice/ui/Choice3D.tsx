@@ -11,7 +11,9 @@ import {
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-export type ModelKind = 'pierre' | 'papier' | 'ciseau' | 'unknown';
+import type { Choice } from '../model/choice';
+
+export type ModelKind = Choice | 'unknown';
 
 export const ACCENT = '#ff5b24';
 
