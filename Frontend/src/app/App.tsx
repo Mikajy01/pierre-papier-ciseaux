@@ -1,41 +1,67 @@
-import { useEffect, useState } from 'react';
-import { Menu } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { LogOut } from 'lucide-react';
+import type { MatchController } from '@/entities/match';
+import { useBotMatch } from '@/features/bot';
 import { HomePage } from '@/features/home';
-import { MatchView } from '@/features/match';
-import { LobbySidebar, useMultiplayer, WaitingRoom } from '@/features/multiplayer';
-import { Panel, useToast } from '@/shared/ui';
+import { MatchView, ScoreBoard } from '@/features/match';
+import { ConnectionBadge, MultiplayerModal, useMultiplayer } from '@/features/multiplayer';
 import { preloadSounds } from '@/shared/lib/sound';
+import { Button, useToast } from '@/shared/ui';
+import { AppHeader } from './AppHeader';
+
+type Mode = 'home' | 'bot' | 'multiplayer';
 
 export function App() {
   const notify = useToast();
-  const mp = useMultiplayer({ onNotice: notify });
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { connect } = mp;
+  const [botActive, setBotActive] = useState(false);
+  const [lobbyOpen, setLobbyOpen] = useState(false);
 
+  const exitBot = useCallback(() => setBotActive(false), []);
+  const bot = useBotMatch({ onExit: exitBot });
+  const mp = useMultiplayer({ onNotice: notify });
+
+  useEffect(preloadSounds, []);
+
+  // The lobby has done its job once the match starts.
   useEffect(() => {
-    preloadSounds();
-    connect();
-  }, [connect]);
+    if (mp.stage === 'playing') setLobbyOpen(false);
+  }, [mp.stage]);
+
+  const mode: Mode = mp.stage === 'playing' ? 'multiplayer' : botActive ? 'bot' : 'home';
+  const match: MatchController | null = mode === 'bot' ? bot : mode === 'multiplayer' ? mp.match : null;
+
+  const openLobby = () => {
+    mp.connect();
+    setLobbyOpen(true);
+  };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex font-sans antialiased bg-grid">
-      <LobbySidebar mp={mp} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="lg:hidden flex items-center justify-end h-14 px-4 border-b border-zinc-800/80">
-          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-md hover:bg-zinc-900" aria-label="Menu">
-            <Menu className="w-5 h-5" />
-          </button>
-        </header>
-        <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
-          {mp.stage === 'idle' && <HomePage />}
-          {mp.stage === 'waiting' && mp.session && (
-            <Panel className="w-full max-w-lg p-8 sm:p-12">
-              <WaitingRoom otp={mp.session.otp} />
-            </Panel>
-          )}
-          {mp.stage === 'playing' && <MatchView match={mp.match} />}
-        </main>
-      </div>
+    <div className="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 font-sans antialiased bg-grid">
+      <AppHeader onHome={match ? match.leave : undefined}>
+        {match ? (
+          <>
+            <ScoreBoard score={match.score} opponentLabel={match.opponentLabel} />
+            <Button variant="ghost" className="h-9 px-3" onClick={match.leave}>
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Quitter</span>
+            </Button>
+          </>
+        ) : (
+          mp.connection !== 'idle' && <ConnectionBadge status={mp.connection} />
+        )}
+      </AppHeader>
+
+      <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
+        {match ? (
+          <MatchView match={match} />
+        ) : (
+          <HomePage onPlayBot={() => setBotActive(true)} onPlayMultiplayer={openLobby} />
+        )}
+      </main>
+
+      <MultiplayerModal mp={mp} open={lobbyOpen && mode === 'home'} onClose={() => setLobbyOpen(false)} />
+
+      <footer className="py-6 text-center text-xs text-zinc-600">© {new Date().getFullYear()} MR.BUG</footer>
     </div>
   );
 }

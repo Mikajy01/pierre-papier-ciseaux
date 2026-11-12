@@ -85,13 +85,13 @@ export function ChoosePhase({ myChoice, opponentLabel, opponentReady, onChoose }
         {myChoice ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            Vous avez choisi {choiceLabel(myChoice)}. En attente de {opponentLabel.toLowerCase()}…
+            Vous avez choisi {choiceLabel(myChoice)}. En attente du choix adverse…
           </>
         ) : (
           opponentReady && (
             <>
               <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-              {opponentLabel} a déjà choisi.
+              {opponentLabel} : choix verrouillé.
             </>
           )
         )}
