@@ -7,13 +7,58 @@ Un jeu en ligne **multijoueur** de Pierre-Papier-Ciseaux, développé avec :
 - 🔌 **WebSocket** : communication temps réel via Socket.IO
 - 🏷️ **Chambres privées** : gestion via OTP unique par session
 
-## 📁 Structure du projet
+## Fonctionnalités
+
+- Mode solo contre un bot (hors ligne)
+- Mode multijoueur temps réel avec code de partie à 4 chiffres
+- Modèles 3D procéduraux (three.js / react-three-fiber)
+
+## Architecture
+
 ```
 pierre-papier-ciseaux/
-├── backend/ # Serveur Express (API, logique du jeu)
-├── frontend/ # Interface utilisateur React (Vite)
-└── README.md # Ce fichier
+├── Backend/                      # Node.js + Express + Socket.IO, architecture modulaire
+│   ├── server.js                 # point d'entrée (charge src/main.js)
+│   ├── src/
+│   │   ├── main.js               # composition : http, socket, modules
+│   │   ├── config/               # variables d'environnement
+│   │   ├── core/                 # création serveur HTTP et Socket.IO
+│   │   ├── shared/               # logger
+│   │   └── modules/
+│   │       ├── game/
+│   │       │   ├── domain/       # Room, règles, choix (aucune dépendance technique)
+│   │       │   ├── application/  # GameService : cas d'usage
+│   │       │   ├── infrastructure/ # dépôt en mémoire, générateur de code
+│   │       │   └── interfaces/   # gateway Socket.IO, routes HTTP, contrat d'événements
+│   │       ├── player/
+│   │       └── health/
+│   └── test/                     # node:test
+└── Frontend/                     # React + Vite + Tailwind, architecture feature-based
+    └── src/
+        ├── app/                  # shell, en-tête, styles globaux
+        ├── shared/               # config, utilitaires, composants UI de base
+        ├── entities/
+        │   ├── choice/           # règles et modèles 3D pierre / papier / ciseaux
+        │   └── match/            # contrat MatchController commun aux modes
+        └── features/
+            ├── home/             # page d'accueil
+            ├── match/            # écrans de manche (choix, compte à rebours, résultat)
+            ├── bot/              # partie contre le bot
+            └── multiplayer/      # client Socket.IO, modale créer / rejoindre
 ```
+
+Chaque mode de jeu (bot, multijoueur) expose un `MatchController` ; l'interface de manche
+(`features/match`) ne connaît pas le mode qui la pilote.
+
+### Variables d'environnement
+
+| Projet   | Variable          | Défaut                         |
+|----------|-------------------|--------------------------------|
+| Backend  | `PORT`            | `5555`                         |
+| Backend  | `HOST`            | `0.0.0.0`                      |
+| Backend  | `CORS_ORIGINS`    | front Render + localhost       |
+| Backend  | `REVEAL_DELAY_MS` | `3000`                         |
+| Frontend | `VITE_SERVER_URL` | URL du backend                 |
 
 ## 🚀 Démarrage rapide
 
@@ -31,14 +76,15 @@ cd pierre-papier-ciseaux
 
 ### 2. Lancer le backend
 ```bash
-cd backend
+cd Backend
 npm install
-npm start
+npm start      # ou npm run dev
+npm test       # tests unitaires
 ```
 
 ### 3. lancer le frontend
 ```bash
-cd ../frontend
+cd ../Frontend
 npm install
 npm run dev
 ```
