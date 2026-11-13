@@ -1,7 +1,10 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import * as THREE from 'three';
-import { HALF_Z, RING_CENTER, RING_RADIUS, RING_STRETCH, RING_TUBE, SCISSORS_SCALE } from '../geometry';
-import { HandleMaterial, RockMesh, ScissorHandle, ScissorScrew } from '../models';
+import { useLayoutEffect, useMemo, useRef } from 'react';
+import type * as THREE from 'three';
+import { getRingGeometry, HALF_Z, RING_CENTER, RING_STRETCH, SCISSORS_SCALE } from '../geometry';
+import { materials } from '../materials';
+import { RockMesh, ScissorHandle, ScissorScrew } from '../models';
+import { castBlobShadow } from '../shadowCaster';
+import { BlobShadow } from '../shadows';
 import { useBattleFrame } from './clock';
 import { Debris } from './debris';
 import { Flashes, Puffs, Sparks, type Flash, type Puff, type SparkBurst } from './fx';
@@ -65,11 +68,8 @@ const point = [0, 0];
 
 export function RockVsScissors() {
   const parts = useMemo(getBreakableScissors, []);
-  const steel = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#eef1f4', metalness: 0.92, roughness: 0.22, envMapIntensity: 1.6 }),
-    [],
-  );
-  useEffect(() => () => steel.dispose(), [steel]);
+  const steel = materials.battleSteel();
+  const handle = materials.handle();
 
   const space = useRef<THREE.Group>(null);
   const rock = useRef<THREE.Group>(null);
@@ -83,6 +83,8 @@ export function RockVsScissors() {
   const ring = useRef<THREE.Mesh>(null);
   const brokenRing = useRef<THREE.Mesh>(null);
   const screw = useRef<THREE.Mesh>(null);
+  const rockShadow = useRef<THREE.Mesh>(null);
+  const scissorsShadow = useRef<THREE.Mesh>(null);
 
   // Anchors mark where each piece sits on the rig; debris are the free-flying copies.
   const tipAnchor = useRef<THREE.Group>(null);
@@ -126,6 +128,7 @@ export function RockVsScissors() {
         ROCK_SCALE * intro,
       );
       rockMesh.current.rotation.set(0.15, 0.35 * Math.max(0, t - BACK_HOME), -rockSpin(t));
+      castBlobShadow(rockShadow.current, point[0], 0, point[1] - GROUND_Y - 0.7, 0.85 * intro);
     }
 
     // --- Scissors: knocked around in the air, then smashed onto the floor
@@ -139,6 +142,14 @@ export function RockVsScissors() {
       scissors.current.position.set(lerp(x, FIGHT_X + 0.1, slam), lerp(y, GROUND_Y + 0.2, slam), -0.25 * slam);
       scissors.current.rotation.set(lerp(rx, -1.2, slam), lerp(ry, 0, slam), lerp(rz, -1.45, slam));
       scissors.current.scale.setScalar(intro);
+      // The wreck spreads on the floor, so its shadow widens once it is down.
+      castBlobShadow(
+        scissorsShadow.current,
+        scissors.current.position.x,
+        scissors.current.position.z,
+        scissors.current.position.y - GROUND_Y - 0.5,
+        (0.7 + 0.5 * slam) * intro,
+      );
     }
 
     // The two halves are forced open, then slide apart once the screw is gone.
@@ -226,13 +237,14 @@ export function RockVsScissors() {
               <mesh ref={backBlade} geometry={parts.intact} material={steel} />
               <ScissorHandle ring={false} />
               <group position={[RING_CENTER.x, RING_CENTER.y, 0]} scale={[RING_STRETCH, 1, 1]}>
-                <mesh ref={ring}>
-                  <torusGeometry args={[RING_RADIUS, RING_TUBE, 32, 96]} />
-                  <HandleMaterial />
-                </mesh>
-                <mesh ref={brokenRing} geometry={parts.ring.broken} rotation-z={parts.ring.brokenAngle} visible={false}>
-                  <HandleMaterial />
-                </mesh>
+                <mesh ref={ring} geometry={getRingGeometry()} material={handle} />
+                <mesh
+                  ref={brokenRing}
+                  geometry={parts.ring.broken}
+                  material={handle}
+                  rotation-z={parts.ring.brokenAngle}
+                  visible={false}
+                />
                 {parts.ring.fragmentAngles.map((angle, i) => (
                   <group key={angle} rotation-z={angle}>
                     <group
@@ -262,11 +274,13 @@ export function RockVsScissors() {
             fragmentDebris.current[i] = o;
           }}
           geometry={parts.ring.fragment}
+          material={handle}
           visible={false}
-        >
-          <HandleMaterial />
-        </mesh>
+        />
       ))}
+
+      <BlobShadow ref={rockShadow} slot="battle-a" />
+      <BlobShadow ref={scissorsShadow} slot="battle-b" />
 
       <Sparks bursts={SPARKS} />
       <Flashes flashes={FLASHES} />

@@ -1,7 +1,6 @@
 import type { Object3D } from 'three';
 
-/** Height of the floor the debris lands on (matches the contact shadows). */
-export const GROUND_Y = -1.35;
+export { GROUND_Y } from '../geometry';
 export const GRAVITY = 9.8;
 /** The winner waits at -HOME_X, the fight happens around +FIGHT_X. */
 export const HOME_X = 2.1;

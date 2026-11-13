@@ -1,66 +1,37 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import {
   BLADE,
-  getPaperTexture,
+  getUnitPlane,
   PAPER_H,
   PAPER_SCALE,
-  PAPER_STACK,
-  PAPER_TILT,
   PAPER_W,
   SCISSORS_SCALE,
 } from '../geometry';
+import { materials } from '../materials';
 import { ScissorsBody } from '../models';
 import { mulberry32 } from '../noise';
+import { castBlobShadow } from '../shadowCaster';
+import { BlobShadow } from '../shadows';
 import { useBattleFrame } from './clock';
-import { cutSheet, type CutLine } from './paperPieces';
+import {
+  BACK_HOME,
+  cutTime,
+  FALL_AT,
+  getCutLayers,
+  PAPER_POSITION,
+  PAPER_QUAT,
+  SLASH_Z,
+  SLASHES,
+  SLIT,
+  slashPoint,
+} from './cuttingPlan';
 import { FIGHT_X, GROUND_Y, HOME_X, onFxLayer } from './stage';
 import { clamp01, decay, ease, kick, lerp, seg, smoothstep, solveDecreasing, track, type Key } from './timeline';
 
 export const SCISSORS_VS_PAPER_DURATION = 3.3;
 
-const deg = (d: number) => (d * Math.PI) / 180;
-
-/**
- * Four slashes across the sheet. `from`/`to` are how far (world units, along the cut)
- * the pivot of the scissors starts before and stops after the point it cuts through.
- */
-const SLASHES = [
-  { through: [0, 0.25], angle: deg(-35), start: 0.95, end: 1.13, from: -2.0, to: 0.7 },
-  { through: [0.05, 0.1], angle: deg(215), start: 1.38, end: 1.56, from: -2.0, to: 0.7 },
-  { through: [0, -0.35], angle: deg(4), start: 1.8, end: 1.98, from: -1.9, to: 0.6 },
-  { through: [0.12, 0], angle: deg(-86), start: 2.22, end: 2.4, from: -2.0, to: 0.25 },
-] as const;
-
-/** A cut is complete once the tips of the blades leave the sheet. */
-const cutTime = (i: number) => lerp(SLASHES[i].start, SLASHES[i].end, 0.75);
-/** After the last slash the sheet holds for a beat, then falls apart. */
-const FALL_AT = 2.55;
-const BACK_HOME = 3.05;
-
 const BLADE_REACH = BLADE.tip.y * SCISSORS_SCALE;
-/** Half the width of the slit left by a cut, in sheet units. */
-const SLIT = 0.018;
-const SLASH_Z = 0.3;
-
-const PAPER_POSITION = new THREE.Vector3(FIGHT_X, 0, 0);
-const PAPER_QUAT = new THREE.Quaternion().setFromEuler(new THREE.Euler(...PAPER_TILT));
-const PAPER_MATRIX = new THREE.Matrix4().compose(
-  PAPER_POSITION,
-  PAPER_QUAT,
-  new THREE.Vector3(PAPER_SCALE, PAPER_SCALE, PAPER_SCALE),
-);
-
-/** Sheet point `distance` world units along slash `i`, lifted in front of the paper. */
-function slashPoint(i: number, distance: number) {
-  const s = SLASHES[i];
-  const u = distance / PAPER_SCALE;
-  return new THREE.Vector3(
-    s.through[0] + Math.cos(s.angle) * u,
-    s.through[1] + Math.sin(s.angle) * u,
-    SLASH_Z / PAPER_SCALE,
-  ).applyMatrix4(PAPER_MATRIX);
-}
 
 /* ------------------------- Scissors choreography ------------------------ */
 
@@ -131,26 +102,13 @@ const drag = (tau: number) => (1 - Math.exp(-3 * tau)) / 3;
 /** Distance fallen by something light that quickly reaches its terminal speed. */
 const sink = (tau: number) => tau - (1 - Math.exp(-2.2 * tau)) / 2.2;
 
-function buildPieces(): FallingPiece[] {
-  const rng = mulberry32(5);
+/** Gives every scrap its own way of falling. A new seed makes each fight flutter differently. */
+function buildPieces(seed: number): FallingPiece[] {
+  const rng = mulberry32(seed);
   const pieces: FallingPiece[] = [];
 
-  PAPER_STACK.forEach((sheet, layer) => {
-    // Express the cuts in the coordinates of this sheet of the stack.
-    const cos = Math.cos(-sheet.rotationZ);
-    const sin = Math.sin(-sheet.rotationZ);
-    const cuts: CutLine[] = SLASHES.map((s) => {
-      const x = s.through[0] - sheet.offset[0];
-      const y = s.through[1] - sheet.offset[1];
-      return { through: [x * cos - y * sin, x * sin + y * cos], angle: s.angle - sheet.rotationZ };
-    });
-    const sheetQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), sheet.rotationZ);
-    const quat = PAPER_QUAT.clone().multiply(sheetQuat);
-    const matrix = PAPER_MATRIX.clone().multiply(
-      new THREE.Matrix4().compose(new THREE.Vector3(...sheet.offset), sheetQuat, new THREE.Vector3(1, 1, 1)),
-    );
-
-    cutSheet(cuts).forEach((piece) => {
+  getCutLayers().forEach(({ cuts, quat, matrix, pieces: scraps }, layer) => {
+    scraps.forEach((piece) => {
       const base = piece.centroid.clone().applyMatrix4(matrix);
       const slits = cuts.map((cut, i) =>
         new THREE.Vector3(-Math.sin(cut.angle), Math.cos(cut.angle), 0)
@@ -219,29 +177,16 @@ const Y_AXIS = new THREE.Vector3(0, 1, 0);
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
 
 export function ScissorsVsPaper() {
-  const pieces = useMemo(buildPieces, []);
-  const materials = useMemo(
-    () =>
-      PAPER_STACK.map((sheet, layer) =>
-        layer === 0
-          ? new THREE.MeshStandardMaterial({ map: getPaperTexture(), roughness: 0.78, side: THREE.DoubleSide })
-          : new THREE.MeshStandardMaterial({ color: sheet.color, roughness: 0.85, side: THREE.DoubleSide }),
-      ),
-    [],
-  );
-  useEffect(
-    () => () => {
-      materials.forEach((m) => m.dispose());
-      pieces.forEach((p) => p.geometry.dispose());
-    },
-    [materials, pieces],
-  );
+  const pieces = useMemo(() => buildPieces(Math.floor(Math.random() * 1e9)), []);
 
   const scissors = useRef<THREE.Group>(null);
   const front = useRef<THREE.Group>(null);
   const back = useRef<THREE.Group>(null);
   const meshes = useRef<(THREE.Mesh | null)[]>([]);
   const trails = useRef<(THREE.Mesh | null)[]>([]);
+  const scissorsShadow = useRef<THREE.Mesh>(null);
+  const paperShadow = useRef<THREE.Mesh>(null);
+  const scrapsShadow = useRef<THREE.Mesh>(null);
   const scratch = useMemo(() => ({ a: new THREE.Quaternion(), b: new THREE.Quaternion() }), []);
 
   useBattleFrame((t, clock) => {
@@ -259,7 +204,13 @@ export function ScissorsVsPaper() {
       scissors.current.scale.setScalar(intro);
       front.current.rotation.z = -open;
       back.current.rotation.z = open;
+      castBlobShadow(scissorsShadow.current, point[0], 0, point[1] - GROUND_Y - 0.7, 0.75 * intro);
     }
+
+    // The sheet's shadow gives way to a wider, fainter one as the scraps settle.
+    const fallen = seg(t, FALL_AT, FALL_AT + 1.2);
+    castBlobShadow(paperShadow.current, FIGHT_X, 0, 0.6, 0.8 * intro, 0.5 * (1 - fallen));
+    castBlobShadow(scrapsShadow.current, FIGHT_X, 0.2, 0, 1.7, 0.4 * seg(t, FALL_AT + 0.8, FALL_AT + 3.5));
 
     // --- Paper: held together with thin slits, then released
     const hover = (1 - seg(t, 0.8, 0.95)) * 0.06 * Math.sin(t * 1.5);
@@ -341,7 +292,7 @@ export function ScissorsVsPaper() {
             meshes.current[i] = o;
           }}
           geometry={piece.geometry}
-          material={materials[piece.layer]}
+          material={materials.paper(piece.layer)}
           position={piece.base}
           quaternion={piece.baseQuat}
           scale={PAPER_SCALE}
@@ -356,15 +307,18 @@ export function ScissorsVsPaper() {
               trails.current[i] = o;
               onFxLayer(o);
             }}
+            geometry={getUnitPlane()}
+            material={materials.trail(i)}
             rotation-z={trail.angle}
             visible={false}
             renderOrder={10}
-          >
-            <planeGeometry args={[1, 1]} />
-            <meshBasicMaterial color="#ffffff" transparent depthWrite={false} toneMapped={false} />
-          </mesh>
+          />
         ))}
       </group>
+
+      <BlobShadow ref={scissorsShadow} slot="battle-a" />
+      <BlobShadow ref={paperShadow} slot="battle-b" />
+      <BlobShadow ref={scrapsShadow} slot="battle-c" />
     </group>
   );
 }

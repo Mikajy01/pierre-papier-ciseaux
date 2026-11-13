@@ -9,9 +9,37 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pierre Papier Ciseaux</title>
+    <!-- Loading screen: styled inline so it shows on the very first paint, before any script. -->
+    <style>
+      html, body { margin: 0; background: #09090b; }
+      .boot {
+        position: fixed; inset: 0; z-index: 200;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+        padding: 24px; background: #09090b; color: #f4f4f5; text-align: center;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        transition: opacity 0.45s ease;
+      }
+      .boot--done { opacity: 0; pointer-events: none; }
+      .boot__logo { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; }
+      .boot__name { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+      .boot__track { width: min(240px, 60vw); height: 3px; border-radius: 3px; background: #27272a; overflow: hidden; }
+      .boot__bar { height: 100%; width: 4%; border-radius: 3px; background: #ff5b24; transition: width 0.35s ease; }
+      .boot__label { margin: 0; min-height: 1.3em; font-size: 13px; color: #a1a1aa; }
+      .boot__retry {
+        height: 40px; padding: 0 18px; border: 0; border-radius: 8px; cursor: pointer;
+        background: #fafafa; color: #09090b; font: inherit; font-size: 14px; font-weight: 500;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot" role="status">
+        <img class="boot__logo" src="/logo.png" alt="" />
+        <p class="boot__name">Pierre Papier Ciseaux</p>
+        <div class="boot__track"><div class="boot__bar"></div></div>
+        <p class="boot__label">Chargement…</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

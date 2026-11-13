@@ -2,6 +2,8 @@ import { useRef } from 'react';
 import type * as THREE from 'three';
 import type { Choice } from '../../../model/choice';
 import { Model } from '../models';
+import { castBlobShadow } from '../shadowCaster';
+import { BlobShadow } from '../shadows';
 import { useBattleFrame } from './clock';
 import { Flashes, Sparks, type Flash, type SparkBurst } from './fx';
 import { HOME_X } from './stage';
@@ -27,6 +29,8 @@ const distance = [0];
 export function DrawClash({ kind }: { kind: Choice }) {
   const left = useRef<THREE.Group>(null);
   const right = useRef<THREE.Group>(null);
+  const leftShadow = useRef<THREE.Mesh>(null);
+  const rightShadow = useRef<THREE.Mesh>(null);
 
   useBattleFrame((t, clock) => {
     track(APPROACH, t, distance);
@@ -39,6 +43,8 @@ export function DrawClash({ kind }: { kind: Choice }) {
     right.current?.position.set(distance[0], -hover + 0.25 * recoil, 0);
     right.current?.rotation.set(0, 0, -0.5 * recoil);
     right.current?.scale.set(-intro, intro, intro);
+    castBlobShadow(leftShadow.current, -distance[0], 0, 0.6 + 0.25 * recoil, 0.85 * intro);
+    castBlobShadow(rightShadow.current, distance[0], 0, 0.6 + 0.25 * recoil, 0.85 * intro);
     clock.shake = 0.08 * decay(t, CLASH, 9);
   });
 
@@ -51,6 +57,8 @@ export function DrawClash({ kind }: { kind: Choice }) {
       <group ref={right} position={[HOME_X, 0, 0]} scale={[-1, 1, 1]}>
         <Model kind={kind} />
       </group>
+      <BlobShadow ref={leftShadow} slot="battle-a" />
+      <BlobShadow ref={rightShadow} slot="battle-b" />
       <Sparks bursts={SPARKS} />
       <Flashes flashes={FLASHES} />
     </group>

@@ -55,9 +55,12 @@ export function ChoosePhase({ myChoice, opponentLabel, opponentReady, onChoose }
                 selected
                   ? 'border-accent bg-zinc-900 ring-1 ring-accent'
                   : 'border-zinc-800/80 bg-zinc-900/40 hover:border-zinc-700 hover:bg-zinc-900/70',
-                dimmed && 'opacity-50 hover:opacity-80',
               )}
             >
+              {/* Veil above the 3D stage: dims the card and its model together. */}
+              {dimmed && (
+                <span className="absolute inset-0 z-[25] bg-zinc-950/60 transition-colors group-hover:bg-zinc-950/30 pointer-events-none" />
+              )}
               <span className="absolute top-4 left-4 font-mono text-xs text-zinc-600">0{i + 1}</span>
               {selected && (
                 <span className="absolute top-4 right-4 inline-flex items-center gap-1 text-[11px] font-medium text-accent">

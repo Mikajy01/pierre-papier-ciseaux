@@ -1,10 +1,24 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { fbm, hash3, mulberry32 } from './noise';
 
-/** Procedural geometry and textures. Everything is built once and shared across canvases. */
+/**
+ * Procedural geometry and textures.
+ * Everything here is built once, kept for the lifetime of the page and never disposed,
+ * so a scene that mounts again finds its buffers already on the GPU.
+ */
+
+const cache = new Map<string, THREE.BufferGeometry>();
+function once(key: string, create: () => THREE.BufferGeometry) {
+  let geometry = cache.get(key);
+  if (!geometry) cache.set(key, (geometry = create()));
+  return geometry;
+}
 
 export const ACCENT = '#ff5b24';
+/** Height of the floor in every scene. */
+export const GROUND_Y = -1.35;
 
 /* ------------------------------- Rock ------------------------------- */
 
@@ -225,7 +239,41 @@ export const SHANK = (() => {
   };
 })();
 
+export const getRingGeometry = () => once('ring', () => new THREE.TorusGeometry(RING_RADIUS, RING_TUBE, 24, 72));
+export const getShankGeometry = () => once('shank', () => new RoundedBoxGeometry(SHANK.length, 0.15, 0.09, 4, 0.04));
+export const getScrewGeometry = () => once('screw', () => new THREE.CylinderGeometry(0.065, 0.065, 0.13, 24));
+
+/* --------------------------- Mystery choice -------------------------- */
+
+export const getOrbGeometry = () => once('orb', () => new THREE.SphereGeometry(0.58, 48, 32));
+export const getCageGeometry = () => once('cage', () => new THREE.IcosahedronGeometry(1, 1));
+
+/* ------------------------------ Rubble ------------------------------ */
+
+export const getGravelGeometry = () => once('gravel', () => new THREE.IcosahedronGeometry(1, 0));
+
+/** Lumpy mound the rubble piles up into. */
+export const getHeapGeometry = () =>
+  once('heap', () => {
+    const geometry = new THREE.IcosahedronGeometry(1, 4);
+    const position = geometry.attributes.position as THREE.BufferAttribute;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < position.count; i++) {
+      v.fromBufferAttribute(position, i);
+      v.multiplyScalar(1 + 0.32 * fbm(v.x * 2.6, v.y * 2.6, v.z * 2.6, 71, 3));
+      position.setXYZ(i, v.x, v.y, v.z);
+    }
+    geometry.computeVertexNormals();
+    return geometry;
+  });
+
 /* ------------------------------ Effects ----------------------------- */
+
+/** 1×1 plane and 1×1×1 box, scaled where they are used. */
+export const getUnitPlane = () => once('unit-plane', () => new THREE.PlaneGeometry(1, 1));
+export const getUnitBox = () => once('unit-box', () => new THREE.BoxGeometry(1, 1, 1));
+export const getFlashRingGeometry = () => once('flash-ring', () => new THREE.RingGeometry(0.93, 1, 64));
+
 
 let softTexture: THREE.CanvasTexture | null = null;
 /** Soft round sprite for dust and glows. */

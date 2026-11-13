@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { getSoftTexture } from '../geometry';
+import { getFlashRingGeometry, getUnitBox } from '../geometry';
+import { materials } from '../materials';
 import { mulberry32 } from '../noise';
 import { useBattleFrame } from './clock';
 import { FX_LAYER, onFxLayer } from './stage';
@@ -21,7 +22,7 @@ const SPARK_GRAVITY = 6;
 const UP = new THREE.Vector3(0, 1, 0);
 
 /** Short-lived glowing shards thrown from impact points. */
-export function Sparks({ bursts, color = '#ffe1b3' }: { bursts: readonly SparkBurst[]; color?: string }) {
+export function Sparks({ bursts }: { bursts: readonly SparkBurst[] }) {
   const mesh = useRef<THREE.InstancedMesh>(null);
   const particles = useMemo(() => {
     const rng = mulberry32(7);
@@ -77,10 +78,7 @@ export function Sparks({ bursts, color = '#ffe1b3' }: { bursts: readonly SparkBu
   });
 
   return (
-    <instancedMesh ref={mesh} args={[undefined, undefined, particles.length]} frustumCulled={false}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshBasicMaterial color={color} toneMapped={false} />
-    </instancedMesh>
+    <instancedMesh ref={mesh} args={[getUnitBox(), materials.spark(), particles.length]} frustumCulled={false} />
   );
 }
 
@@ -98,7 +96,6 @@ const FLASH_LIFE = 0.2;
 export function Flashes({ flashes }: { flashes: readonly Flash[] }) {
   const rings = useRef<(THREE.Mesh | null)[]>([]);
   const glows = useRef<(THREE.Sprite | null)[]>([]);
-  const soft = useMemo(getSoftTexture, []);
 
   useBattleFrame((t) => {
     flashes.forEach((flash, i) => {
@@ -128,22 +125,20 @@ export function Flashes({ flashes }: { flashes: readonly Flash[] }) {
               rings.current[i] = o;
               onFxLayer(o);
             }}
+            geometry={getFlashRingGeometry()}
+            material={materials.flash(i)}
             visible={false}
             renderOrder={10}
-          >
-            <ringGeometry args={[0.93, 1, 64]} />
-            <meshBasicMaterial color="#ffffff" transparent depthTest={false} depthWrite={false} toneMapped={false} />
-          </mesh>
+          />
           <sprite
             ref={(o) => {
               glows.current[i] = o;
               onFxLayer(o);
             }}
+            material={materials.glow(i)}
             visible={false}
             renderOrder={9}
-          >
-            <spriteMaterial map={soft} color="#fff1d6" transparent depthTest={false} depthWrite={false} toneMapped={false} />
-          </sprite>
+          />
         </group>
       ))}
     </>
@@ -163,13 +158,11 @@ export interface Puff {
   size: number;
   life: number;
   opacity: number;
-  color?: string;
 }
 
 /** Soft dust clouds that expand and fade. */
 export function Puffs({ puffs }: { puffs: readonly Puff[] }) {
   const sprites = useRef<(THREE.Sprite | null)[]>([]);
-  const soft = useMemo(getSoftTexture, []);
   const items = useMemo(() => {
     const rng = mulberry32(21);
     return puffs.flatMap((puff) =>
@@ -207,17 +200,16 @@ export function Puffs({ puffs }: { puffs: readonly Puff[] }) {
 
   return (
     <>
-      {items.map((item, i) => (
+      {items.map((_, i) => (
         <sprite
           key={i}
           ref={(o) => {
             sprites.current[i] = o;
             onFxLayer(o);
           }}
+          material={materials.puff(i)}
           visible={false}
-        >
-          <spriteMaterial map={soft} color={item.puff.color ?? '#9a948a'} transparent depthWrite={false} />
-        </sprite>
+        />
       ))}
     </>
   );

@@ -36,7 +36,7 @@ export interface SheetState {
   bumps: readonly { dir: THREE.Vector3; height: number }[];
 }
 
-export function createWrapSheet() {
+function createWrapSheet() {
   const geometry = new THREE.PlaneGeometry(PAPER_W, PAPER_H, COLUMNS, ROWS);
   const position = geometry.attributes.position as THREE.BufferAttribute;
   const count = position.count;
@@ -127,4 +127,11 @@ export function createWrapSheet() {
   }
 
   return { geometry, update };
+}
+
+let shared: ReturnType<typeof createWrapSheet> | null = null;
+/** The sheet is built once and reused by every fight (only one fight runs at a time). */
+export function getWrapSheet() {
+  shared ??= createWrapSheet();
+  return shared;
 }

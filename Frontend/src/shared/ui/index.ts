@@ -1,4 +1,5 @@
 export { Button } from './Button';
+export { ErrorBoundary } from './ErrorBoundary';
 export { Eyebrow } from './Eyebrow';
 export { Logo } from './Logo';
 export { Modal } from './Modal';

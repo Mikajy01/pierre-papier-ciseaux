@@ -13,6 +13,7 @@ Un jeu en ligne **multijoueur** de Pierre-Papier-Ciseaux, développé avec :
 - Mode multijoueur temps réel avec code de partie à 4 chiffres
 - Modèles 3D procéduraux (three.js / react-three-fiber)
 - Combats animés à chaque manche : la pierre fracasse les ciseaux, les ciseaux découpent le papier, le papier étouffe la pierre
+- Chargement unique au démarrage : un seul canvas WebGL pour tout le site, modèles et shaders préparés une fois derrière un écran de chargement
 
 ## Architecture
 
@@ -36,7 +37,7 @@ pierre-papier-ciseaux/
 │   └── test/                     # node:test
 └── Frontend/                     # React + Vite + Tailwind, architecture feature-based
     └── src/
-        ├── app/                  # shell, en-tête, styles globaux
+        ├── app/                  # séquence de démarrage (boot/), shell, en-tête, styles globaux
         ├── shared/               # config, utilitaires, composants UI de base
         ├── entities/
         │   ├── choice/           # règles, modèles 3D et combats animés (ui/three/battle)

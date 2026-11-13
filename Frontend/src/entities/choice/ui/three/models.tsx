@@ -1,116 +1,93 @@
-import { useMemo, useRef, type ReactNode, type Ref } from 'react';
+import { useRef, type ReactNode, type Ref } from 'react';
 import { useFrame, type ThreeElements } from '@react-three/fiber';
-import { MeshDistortMaterial, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Choice } from '../../model/choice';
 import {
-  ACCENT,
   getBladeGeometry,
+  getCageGeometry,
+  getOrbGeometry,
   getPaperGeometry,
-  getPaperTexture,
+  getRingGeometry,
   getRockGeometry,
+  getScrewGeometry,
+  getShankGeometry,
   HALF_Z,
   PAPER_SCALE,
   PAPER_STACK,
   PAPER_TILT,
   RING_CENTER,
-  RING_RADIUS,
   RING_STRETCH,
-  RING_TUBE,
   SCISSORS_SCALE,
   SHANK,
 } from './geometry';
+import { materials } from './materials';
+
+/**
+ * The 3D models. They only assemble shared geometries and materials, so mounting one
+ * creates a handful of scene nodes and nothing on the GPU.
+ */
 
 export type ModelKind = Choice | 'unknown';
-
-/* ----------------------------- Materials ---------------------------- */
-
-export function RockMaterial() {
-  return <meshStandardMaterial vertexColors roughness={0.92} metalness={0.02} />;
-}
-
-export function SteelMaterial() {
-  return <meshStandardMaterial color="#eef1f4" metalness={0.92} roughness={0.22} envMapIntensity={1.6} />;
-}
-
-export function HandleMaterial() {
-  return <meshPhysicalMaterial color={ACCENT} roughness={0.32} clearcoat={0.8} clearcoatRoughness={0.2} />;
-}
 
 /* ---------------------------- Static parts -------------------------- */
 
 export function RockMesh(props: ThreeElements['mesh']) {
-  const geo = useMemo(getRockGeometry, []);
-  return (
-    <mesh geometry={geo} {...props}>
-      <RockMaterial />
-    </mesh>
-  );
+  return <mesh geometry={getRockGeometry()} material={materials.rock()} {...props} />;
 }
 
 /** Back sheets of the paper stack (everything but the printed top sheet). */
 export function PaperBackSheets() {
-  const geo = useMemo(getPaperGeometry, []);
   return (
     <>
-      {PAPER_STACK.slice(1).map((sheet) => (
-        <mesh key={sheet.color} geometry={geo} position={[...sheet.offset]} rotation-z={sheet.rotationZ}>
-          <meshStandardMaterial color={sheet.color} roughness={0.85} side={THREE.DoubleSide} />
-        </mesh>
-      ))}
+      {PAPER_STACK.map((sheet, layer) =>
+        layer === 0 ? null : (
+          <mesh
+            key={layer}
+            geometry={getPaperGeometry()}
+            material={materials.paper(layer)}
+            position={[...sheet.offset]}
+            rotation-z={sheet.rotationZ}
+          />
+        ),
+      )}
     </>
   );
 }
 
 export function PaperTopSheet() {
-  const geo = useMemo(getPaperGeometry, []);
-  const tex = useMemo(getPaperTexture, []);
-  return (
-    <mesh geometry={geo}>
-      <meshStandardMaterial map={tex} roughness={0.78} side={THREE.DoubleSide} />
-    </mesh>
-  );
+  return <mesh geometry={getPaperGeometry()} material={materials.paper(0)} />;
 }
 
 /** Plastic handle of one scissor half: shank bar and, optionally, the finger ring. */
 export function ScissorHandle({ ring = true }: { ring?: boolean }) {
   return (
     <>
-      <RoundedBox
-        args={[SHANK.length, 0.15, 0.09]}
-        radius={0.04}
-        smoothness={4}
+      <mesh
+        geometry={getShankGeometry()}
+        material={materials.handle()}
         position={[SHANK.mid.x, SHANK.mid.y, 0]}
         rotation-z={SHANK.angle}
-      >
-        <HandleMaterial />
-      </RoundedBox>
+      />
       {ring && (
-        <mesh position={[RING_CENTER.x, RING_CENTER.y, 0]} scale={[RING_STRETCH, 1, 1]}>
-          <torusGeometry args={[RING_RADIUS, RING_TUBE, 32, 96]} />
-          <HandleMaterial />
-        </mesh>
+        <mesh
+          geometry={getRingGeometry()}
+          material={materials.handle()}
+          position={[RING_CENTER.x, RING_CENTER.y, 0]}
+          scale={[RING_STRETCH, 1, 1]}
+        />
       )}
     </>
   );
 }
 
 export function ScissorScrew(props: ThreeElements['mesh']) {
-  return (
-    <mesh rotation-x={Math.PI / 2} {...props}>
-      <cylinderGeometry args={[0.065, 0.065, 0.13, 32]} />
-      <meshStandardMaterial color="#9ea3ab" metalness={1} roughness={0.25} />
-    </mesh>
-  );
+  return <mesh geometry={getScrewGeometry()} material={materials.screw()} rotation-x={Math.PI / 2} {...props} />;
 }
 
 function ScissorHalf({ mirror }: { mirror?: boolean }) {
-  const blade = useMemo(getBladeGeometry, []);
   return (
     <group scale={[mirror ? -1 : 1, 1, 1]} position-z={mirror ? -HALF_Z : HALF_Z}>
-      <mesh geometry={blade}>
-        <SteelMaterial />
-      </mesh>
+      <mesh geometry={getBladeGeometry()} material={materials.steel()} />
       <ScissorHandle />
     </group>
   );
@@ -192,23 +169,29 @@ function Scissors({ active }: ModelProps) {
   );
 }
 
+/** Stand-in for a choice that is still hidden: a restless dark orb in a wire cage. */
 function Mystery() {
   const cage = useRef<THREE.Mesh>(null);
-  useFrame((_, dt) => {
-    if (!cage.current) return;
-    cage.current.rotation.y += dt * 0.5;
-    cage.current.rotation.x += dt * 0.2;
+  const orb = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }, dt) => {
+    const t = clock.getElapsedTime();
+    if (cage.current) {
+      cage.current.rotation.y += dt * 0.5;
+      cage.current.rotation.x += dt * 0.2;
+    }
+    if (orb.current) {
+      orb.current.scale.set(
+        1 + 0.1 * Math.sin(t * 2.3),
+        1 + 0.1 * Math.sin(t * 2.9 + 1.7),
+        1 + 0.1 * Math.sin(t * 1.9 + 3.1),
+      );
+      orb.current.rotation.set(t * 0.4, t * 0.6, 0);
+    }
   });
   return (
     <group>
-      <mesh ref={cage}>
-        <icosahedronGeometry args={[1, 1]} />
-        <meshBasicMaterial color="#52525b" wireframe transparent opacity={0.6} />
-      </mesh>
-      <mesh>
-        <sphereGeometry args={[0.58, 96, 96]} />
-        <MeshDistortMaterial color="#1c1c1f" metalness={0.9} roughness={0.12} distort={0.38} speed={2.2} />
-      </mesh>
+      <mesh ref={cage} geometry={getCageGeometry()} material={materials.cage()} />
+      <mesh ref={orb} geometry={getOrbGeometry()} material={materials.orb()} />
     </group>
   );
 }

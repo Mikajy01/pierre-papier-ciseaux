@@ -1,13 +1,17 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { getPaperTexture, getSoftTexture, PAPER_SCALE, PAPER_TILT } from '../geometry';
+import { getGravelGeometry, getHeapGeometry, PAPER_SCALE, PAPER_TILT } from '../geometry';
+import { materials } from '../materials';
 import { PaperBackSheets, RockMesh } from '../models';
-import { fbm, mulberry32 } from '../noise';
+import { mulberry32 } from '../noise';
+import { castBlobShadow } from '../shadowCaster';
+import { BlobShadow } from '../shadows';
 import { useBattleFrame } from './clock';
 import { Puffs, type Puff } from './fx';
+import { DUST_COUNT, getDustGeometry, GRAVEL_COUNT } from './rubble';
 import { FIGHT_X, GRAVITY, GROUND_Y, HOME_X, onFxLayer } from './stage';
 import { clamp01, decay, ease, kick, landingTime, lerp, seg, solveDecreasing, track, type Key } from './timeline';
-import { createWrapSheet, WRAP_RADIUS, type SheetState } from './wrapSheet';
+import { getWrapSheet, WRAP_RADIUS, type SheetState } from './wrapSheet';
 
 /* -------------------------------- Timeline ------------------------------- */
 
@@ -111,22 +115,6 @@ const DROP = new THREE.Vector3(ROCK.x, ROCK.y + LIFT - 0.1, ROCK.z);
 /** Height of the heap of rubble at a given distance from its centre. */
 const heap = (distance: number) => 0.3 * Math.exp(-Math.pow(distance / 0.6, 2));
 
-/** Lumpy mound the rubble piles up into. */
-function buildHeap() {
-  const geometry = new THREE.IcosahedronGeometry(1, 4);
-  const position = geometry.attributes.position as THREE.BufferAttribute;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < position.count; i++) {
-    v.fromBufferAttribute(position, i);
-    v.multiplyScalar(1 + 0.32 * fbm(v.x * 2.6, v.y * 2.6, v.z * 2.6, 71, 3));
-    position.setXYZ(i, v.x, v.y, v.z);
-  }
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-const GRAVEL_COUNT = 56;
-const DUST_COUNT = 460;
 const DUST_SINK = 2.4; // drag makes dust reach its falling speed quickly
 const dustFall = (tau: number) => tau - (1 - Math.exp(-DUST_SINK * tau)) / DUST_SINK;
 
@@ -173,7 +161,6 @@ function buildRubble() {
       speed,
       land: solveDecreasing((tau) => start.y - speed * dustFall(tau) - floor, 0, 20),
       floor,
-      shade: 0.45 + rng() * 0.5,
     };
   });
 
@@ -199,35 +186,16 @@ const point = [0, 0, 0];
 const scalar = [0];
 
 export function PaperVsRock() {
-  const sheet = useMemo(createWrapSheet, []);
+  const sheet = getWrapSheet();
   const rubble = useMemo(buildRubble, []);
-  const texture = useMemo(getPaperTexture, []);
-  const soft = useMemo(getSoftTexture, []);
-  const heapGeometry = useMemo(buildHeap, []);
-  useEffect(
-    () => () => {
-      sheet.geometry.dispose();
-      heapGeometry.dispose();
-    },
-    [sheet, heapGeometry],
-  );
-
+  const dustGeometry = getDustGeometry();
   const paper = useRef<THREE.Group>(null);
   const stack = useRef<THREE.Group>(null);
   const rock = useRef<THREE.Mesh>(null);
   const gravel = useRef<THREE.InstancedMesh>(null);
   const dust = useRef<THREE.Points>(null);
   const heapMesh = useRef<THREE.Mesh>(null);
-
-  const dustGeometry = useMemo(() => {
-    const geometry = new THREE.BufferGeometry();
-    const colors = new Float32Array(DUST_COUNT * 3);
-    rubble.dust.forEach((grain, i) => colors.set([0.62 * grain.shade, 0.6 * grain.shade, 0.56 * grain.shade], i * 3));
-    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(DUST_COUNT * 3), 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    return geometry;
-  }, [rubble]);
-  useEffect(() => () => dustGeometry.dispose(), [dustGeometry]);
+  const fightShadow = useRef<THREE.Mesh>(null);
 
   useLayoutEffect(() => {
     onFxLayer(dust.current);
@@ -345,10 +313,24 @@ export function PaperVsRock() {
       position.needsUpdate = true;
     }
 
+    const heaped = ease.outCubic(seg(t, OPEN_START + 0.4, OPEN_START + 1.3));
     if (heapMesh.current) {
-      const grown = ease.outCubic(seg(t, OPEN_START + 0.4, OPEN_START + 1.3));
-      heapMesh.current.visible = grown > 0;
-      heapMesh.current.scale.set(0.58 * grown, 0.24 * grown, 0.44 * grown);
+      heapMesh.current.visible = heaped > 0;
+      heapMesh.current.scale.set(0.58 * heaped, 0.24 * heaped, 0.44 * heaped);
+    }
+
+    // One shadow for whatever stands at the fight spot: the rock, the paper ball, then the rubble.
+    {
+      const lifted = seg(t, LIFT_START, LIFT_END);
+      const airborne = (1 - lifted) * (1 - seg(t, OPEN_START, OPEN_END));
+      castBlobShadow(
+        fightShadow.current,
+        ROCK.x,
+        0,
+        lerp(0.55, 0, heaped),
+        lerp(0.75 * squeeze, 0.8, heaped) * intro,
+        0.5 * Math.max(airborne, heaped),
+      );
     }
 
     clock.shake = SQUEEZES.reduce((sum, at) => sum + 0.06 * decay(t, at + 0.1, 9), 0) + 0.05 * decay(t, POUNCE, 10);
@@ -362,25 +344,29 @@ export function PaperVsRock() {
       </group>
 
       <group ref={paper} position={BALL_HOME} quaternion={Q_HOME} scale={PAPER_SCALE}>
-        <mesh geometry={sheet.geometry} frustumCulled={false}>
-          <meshStandardMaterial map={texture} roughness={0.8} side={THREE.DoubleSide} />
-        </mesh>
+        <mesh geometry={sheet.geometry} material={materials.paper(0)} frustumCulled={false} />
       </group>
 
       <RockMesh ref={rock} position={ROCK} scale={ROCK_SCALE} />
 
-      <instancedMesh ref={gravel} args={[undefined, undefined, GRAVEL_COUNT]} frustumCulled={false}>
-        <icosahedronGeometry args={[1, 0]} />
-        <meshStandardMaterial roughness={0.95} flatShading />
-      </instancedMesh>
+      <instancedMesh
+        ref={gravel}
+        args={[getGravelGeometry(), materials.gravel(), GRAVEL_COUNT]}
+        frustumCulled={false}
+      />
 
-      <points ref={dust} geometry={dustGeometry} frustumCulled={false}>
-        <pointsMaterial map={soft} size={0.095} sizeAttenuation vertexColors transparent alphaTest={0.05} depthWrite={false} />
-      </points>
+      <points ref={dust} geometry={dustGeometry} material={materials.dust()} frustumCulled={false} />
 
-      <mesh ref={heapMesh} geometry={heapGeometry} position={[ROCK.x, GROUND_Y + 0.02, ROCK.z]} visible={false}>
-        <meshStandardMaterial color="#5d5a55" roughness={1} flatShading />
-      </mesh>
+      <mesh
+        ref={heapMesh}
+        geometry={getHeapGeometry()}
+        material={materials.heap()}
+        position={[ROCK.x, GROUND_Y + 0.02, ROCK.z]}
+        visible={false}
+      />
+
+      <BlobShadow slot="battle-a" x={-HOME_X} size={2.2} />
+      <BlobShadow ref={fightShadow} slot="battle-b" />
 
       <Puffs puffs={PUFFS} />
     </group>

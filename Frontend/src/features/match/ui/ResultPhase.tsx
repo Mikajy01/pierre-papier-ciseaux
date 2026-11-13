@@ -60,7 +60,7 @@ export function ResultPhase({ outcome, myChoice, opponentChoice, opponentLabel, 
 
       <div className="relative rounded-2xl border border-zinc-800/80 bg-zinc-900/40 overflow-hidden mb-8">
         <ChoiceBattle mine={myChoice} theirs={opponentChoice} onDone={reveal} className="h-72 sm:h-96 w-full" />
-        <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-4 p-4 sm:p-5 pointer-events-none">
+        <div className="absolute inset-x-0 top-0 z-[25] flex items-start justify-between gap-4 p-4 sm:p-5 pointer-events-none">
           {sides.map((side) => (
             <div key={side.who} className={side.align}>
               <p className="text-xs text-zinc-500">{side.who}</p>

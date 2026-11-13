@@ -1,2 +1,3 @@
 export * from './model/choice';
-export { ChoiceBattle, ChoiceHero, ChoiceModel } from './ui/scenes';
+export { getChoice3D, loadChoice3D, type LoadProgress } from './ui/runtime';
+export { ChoiceBattle, ChoiceHero, ChoiceModel, ChoiceStage } from './ui/scenes';

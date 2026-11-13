@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import type { PerspectiveCamera } from 'three';
 import { ClockContext, type BattleClock } from './clock';
 import { FX_LAYER } from './stage';
 
@@ -32,7 +33,7 @@ export function BattleStage({ duration, frozenAt, onDone, children }: Props) {
       onDoneRef.current?.();
     }
     // Keep the whole arena in frame on narrow canvases.
-    const aspect = state.size.width / state.size.height;
+    const aspect = (state.camera as PerspectiveCamera).aspect;
     const distance = Math.max(7.4, 12.6 / aspect);
     const s = c.shake;
     state.camera.position.set(Math.sin(c.t * 97) * s, 2.5 + Math.cos(c.t * 83) * s, distance);
