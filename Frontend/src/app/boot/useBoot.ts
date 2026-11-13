@@ -18,6 +18,12 @@ interface BootState {
   error?: string;
 }
 
+/**
+ * The loading screen stays up at least this long after the page started loading. On a fast
+ * machine everything is ready in a blink, and a screen that flashes by looks like a glitch.
+ */
+const MIN_SPLASH_MS = 900;
+
 /** While a step reports nothing (a download, a compile), the bar creeps towards this ceiling. */
 const CREEP_CEILING: Partial<Record<BootPhase, number>> = { loading: 0.42, warming: 0.97 };
 
@@ -26,7 +32,6 @@ export function useBoot() {
   const [state, setState] = useState<BootState>({ phase: 'loading', progress: 0.04, label: 'Chargement du moteur 3D' });
 
   useEffect(() => {
-    preloadSounds();
     loadChoice3D(({ progress, label }) =>
       setState((s) => (s.phase === 'loading' ? { ...s, label, progress: Math.max(s.progress, progress) } : s)),
     )
@@ -48,7 +53,16 @@ export function useBoot() {
     return () => clearInterval(id);
   }, [ceiling]);
 
-  const ready = useCallback(() => setState({ phase: 'ready', progress: 1, label: 'Prêt' }), []);
+  const ready = useCallback(() => {
+    // Sounds are only needed at the end of the first round: fetch them now, once the
+    // engine no longer competes for the connection.
+    preloadSounds();
+    const reveal = () => setState({ phase: 'ready', progress: 1, label: 'Prêt' });
+    const remaining = MIN_SPLASH_MS - performance.now(); // performance.now() counts from navigation start
+    if (remaining <= 0) return reveal();
+    setState((s) => ({ ...s, progress: 1, label: 'Prêt' }));
+    setTimeout(reveal, remaining);
+  }, []);
   /** The 3D stage could not start: WebGL is missing or blocked. */
   const fail = useCallback(
     () => setState((s) => ({ ...s, phase: 'error', error: "Votre navigateur n'a pas pu démarrer l'affichage 3D." })),

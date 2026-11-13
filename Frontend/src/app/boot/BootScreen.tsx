@@ -27,7 +27,7 @@ export function BootScreen({ progress, label, done, error }: Props) {
 
   return (
     <div className={done ? 'boot boot--done' : 'boot'} role="status" aria-live="polite" aria-busy={!done}>
-      <img className="boot__logo" src="/logo.png" alt="" />
+      <img className="boot__logo" src="/logo-128.png" width={56} height={56} alt="" />
       <p className="boot__name">Pierre Papier Ciseaux</p>
       {error ? (
         <>
